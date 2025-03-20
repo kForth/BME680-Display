@@ -18,10 +18,6 @@
 
 #define REPORT_PERIOD 1000
 
-#define IAQ_MAX = 500
-#define IAQ_DANGER = 200
-#define IAQ_WARNING = 100
-#define IAD_SAFE = 50
 float iaqLevels[] = { 50, 100, 150, 200, 250, 350, 65535 };
 uint8_t numIaqLevels = ARRAY_LEN(iaqLevels);
 String iaqText[] = {
