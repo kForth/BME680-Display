@@ -1,5 +1,6 @@
 #define TITLE "BME680 Display"
 #define VERSION "1.0"
+// #define DEBUG
 
 #include <Arduino.h>
 #include <bsec2.h>
@@ -43,30 +44,29 @@ void drawDisplay();
 
 Bsec2 envSensor;
 bsecSensor sensorList[] = {
-  BSEC_OUTPUT_IAQ,
-  BSEC_OUTPUT_RAW_TEMPERATURE,
-  BSEC_OUTPUT_RAW_PRESSURE,
-  BSEC_OUTPUT_RAW_HUMIDITY,
-  BSEC_OUTPUT_RAW_GAS,
   BSEC_OUTPUT_STABILIZATION_STATUS,
   BSEC_OUTPUT_RUN_IN_STATUS,
+  BSEC_OUTPUT_IAQ,
+  BSEC_OUTPUT_STATIC_IAQ,
   BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE,
   BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_HUMIDITY,
-  BSEC_OUTPUT_STATIC_IAQ,
+  BSEC_OUTPUT_RAW_PRESSURE,
   BSEC_OUTPUT_CO2_EQUIVALENT,
   BSEC_OUTPUT_BREATH_VOC_EQUIVALENT,
   BSEC_OUTPUT_GAS_PERCENTAGE,
-  BSEC_OUTPUT_COMPENSATED_GAS
+  BSEC_OUTPUT_COMPENSATED_GAS,
+#ifdef DEBUG
+  BSEC_OUTPUT_RAW_TEMPERATURE,
+  BSEC_OUTPUT_RAW_HUMIDITY,
+  BSEC_OUTPUT_RAW_GAS,
+#endif
 };
 
 struct state {
   int timestamp;
   float iaq;
   int iaqAccuracy;
-  float temperatureRaw;
   float pressureRaw;
-  float humidtyRaw;
-  float gasRaw;
   float stabilizationstatus;
   float runInStatus;
   float temperature;
@@ -77,6 +77,11 @@ struct state {
   float gasPercentage;
   float gas;
   String airQuality;
+#ifdef DEBUG
+  float temperatureRaw;
+  float humidtyRaw;
+  float gasRaw;
+#endif
 };
 state sensor_data;
 
@@ -178,20 +183,22 @@ void drawDisplay() {
 void reportToSerial() {
   Serial.println("Air Quality: " + String(sensor_data.airQuality));
   Serial.println("Timestamp: " + String(sensor_data.timestamp));
-  Serial.println("IAQ: " + String(sensor_data.iaq) + " (" + String(sensor_data.iaqAccuracy) + ")");
-  Serial.println("Raw Temperature: " + String(sensor_data.temperatureRaw) + " C");
-  Serial.println("Raw Pressure: " + String(sensor_data.pressureRaw) + " Pa");
-  Serial.println("Raw Humidity: " + String(sensor_data.humidtyRaw) + " %");
-  Serial.println("Raw Gas: " + String(sensor_data.gasRaw));
   Serial.println("Stabilization Status: " + String(sensor_data.stabilizationstatus));
   Serial.println("Run-in Status: " + String(sensor_data.runInStatus));
+  Serial.println("IAQ: " + String(sensor_data.iaq) + " (" + String(sensor_data.iaqAccuracy) + ")");
+  Serial.println("Static IAQ: " + String(sensor_data.staticIaq));
+  Serial.println("Raw Pressure: " + String(sensor_data.pressureRaw) + " Pa");
   Serial.println("Temperature: " + String(sensor_data.temperature) + " C");
   Serial.println("Humidity: " + String(sensor_data.humidity) + " %");
-  Serial.println("Static IAQ: " + String(sensor_data.staticIaq));
   Serial.println("CO2 Equivalent: " + String(sensor_data.equivCo2));
   Serial.println("Breath VOC Equivalent: " + String(sensor_data.equivVoc));
   Serial.println("Gas Percentage: " + String(sensor_data.gasPercentage) + " %");
   Serial.println("Gas: " + String(sensor_data.gas));
+#ifdef DEBUG
+  Serial.println("Raw Temperature: " + String(sensor_data.temperatureRaw) + " C");
+  Serial.println("Raw Humidity: " + String(sensor_data.humidtyRaw) + " %");
+  Serial.println("Raw Gas: " + String(sensor_data.gasRaw));
+#endif
   Serial.println();
 }
 
@@ -226,11 +233,12 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
       sensor_data.iaq = output.signal;
       sensor_data.iaqAccuracy = (int)output.accuracy;
       break;
+      case BSEC_OUTPUT_RAW_PRESSURE:
+        sensor_data.pressureRaw = output.signal;
+        break;
+#ifdef DEBUG
     case BSEC_OUTPUT_RAW_TEMPERATURE:
       sensor_data.temperatureRaw = output.signal;
-      break;
-    case BSEC_OUTPUT_RAW_PRESSURE:
-      sensor_data.pressureRaw = output.signal;
       break;
     case BSEC_OUTPUT_RAW_HUMIDITY:
       sensor_data.humidtyRaw = output.signal;
@@ -238,6 +246,7 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
     case BSEC_OUTPUT_RAW_GAS:
       sensor_data.gasRaw = output.signal;
       break;
+#endif
     case BSEC_OUTPUT_STABILIZATION_STATUS:
       sensor_data.stabilizationstatus = output.signal;
       break;
