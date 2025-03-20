@@ -7,6 +7,13 @@
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_ST7789.h>
 
+#include "pico/stdlib.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
+
+#define FLASH_TARGET_OFFSET (256 * 1024) // Offset in flash memory for storing state
+#define STATE_SAVE_PERIOD UINT32_C(360 * 60 * 1000) /* 360 minutes - 4 times a day */
+
 #define TFT_CS A3
 #define TFT_DC D24
 #define TFT_RST D25
@@ -30,8 +37,11 @@ String iaqText[] = {
   "Extremely Polluted",
 };
 
-void bsecCheckStatus();
 void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bsec);
+void bsecCheckStatus();
+void bsecUpdateState();
+bool saveState();
+bool loadState();
 String getStatusStringBME(int code);
 String getStatusStringBSEC(bsec_library_return_t code);
 void reportToSerial();
@@ -57,6 +67,9 @@ bsecSensor sensorList[] = {
   BSEC_OUTPUT_RAW_GAS,
 #endif
 };
+
+static uint8_t bsecState[BSEC_MAX_STATE_BLOB_SIZE];
+uint16_t stateUpdateCounter = 0;
 
 struct state {
   int timestamp;
@@ -94,6 +107,7 @@ void setup(void)
   
   // BME680 Environment Sensor
   !envSensor.begin(BME68X_I2C_ADDR_HIGH, Wire);
+  loadState();
   envSensor.setTemperatureOffset(TEMP_OFFSET_ULP);
   envSensor.updateSubscription(sensorList, ARRAY_LEN(sensorList), BSEC_SAMPLE_RATE_ULP);
   envSensor.attachCallback(bsecDataCallback);
@@ -282,6 +296,17 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
       break;
     }
   }
+
+  bsecUpdateState();
+}
+
+void bsecUpdateState()
+{
+  bool update = !stateUpdateCounter || (stateUpdateCounter * STATE_SAVE_PERIOD) < millis();
+  if (update)
+      stateUpdateCounter++;
+  if (update && !saveState())
+    bsecCheckStatus();
 }
 
 void bsecCheckStatus()
@@ -392,4 +417,52 @@ String getStatusStringBSEC(bsec_library_return_t code) {
   default:
     return "Unknown Error";
   }
+}
+
+bool loadState()
+{
+  // Load state from flash memory
+  const uint8_t* flashMemory = (const uint8_t*)(XIP_BASE + FLASH_TARGET_OFFSET);
+  if (flashMemory[0] == BSEC_MAX_STATE_BLOB_SIZE) {
+      /* Existing state in flash memory */
+      Serial.println("Reading state from flash memory");
+      Serial.print("State file: ");
+      for (uint8_t i = 0; i < BSEC_MAX_STATE_BLOB_SIZE; i++) {
+          bsecState[i] = flashMemory[i + 1];
+          Serial.print(String(bsecState[i], HEX) + ", ");
+      }
+      Serial.println();
+
+      if (!envSensor.setState(bsecState))
+          return false;
+  } else {
+      /* Erase the flash memory with zeroes */
+      Serial.println("Erasing flash memory");
+
+      uint8_t flashBuffer[FLASH_PAGE_SIZE] = {0};
+      uint32_t interrupts = save_and_disable_interrupts();
+      flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
+      flash_range_program(FLASH_TARGET_OFFSET, flashBuffer, FLASH_PAGE_SIZE);
+      restore_interrupts(interrupts);
+  }
+  return true;
+}
+
+bool saveState()
+{
+  if (!envSensor.getState(bsecState))
+      return false;
+
+  Serial.println("Writing state to EEPROM");
+  // Save state to flash memory
+  uint8_t flashBuffer[FLASH_PAGE_SIZE];
+  memcpy(flashBuffer, bsecState, BSEC_MAX_STATE_BLOB_SIZE);
+
+  uint32_t interrupts = save_and_disable_interrupts();
+  flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
+  flash_range_program(FLASH_TARGET_OFFSET, flashBuffer, FLASH_PAGE_SIZE);
+  restore_interrupts(interrupts);
+
+  Serial.println("State saved to flash memory");
+  return true;
 }
