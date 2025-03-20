@@ -150,12 +150,12 @@ void updateCanvas() {
     canvas.setTextSize(2);
     canvas.println("Air Quality: " + String(sensor_data.airQuality));
     canvas.println();
-    canvas.println("Timestamp: " + String(sensor_data.timestamp));
-    canvas.println("IAQ: " + String(sensor_data.iaq, 0) + " (" + String(sensor_data.iaqAccuracy) + ")");
     canvas.println("Temperature: " + String(sensor_data.temperature, 1) + " C");
     canvas.println("Humidity: " + String(sensor_data.humidity, 1) + " %");
-    canvas.println("Pressure: " + String(sensor_data.pressureRaw, 1) + " Pa");
-    canvas.println("IAQ: " + String(sensor_data.staticIaq, 0));
+    canvas.println("Pressure: " + String(sensor_data.pressureRaw/10, 1) + " kPa");
+    canvas.println("IAQ: " + String(sensor_data.iaq, 0));
+    canvas.println("S-IAQ: " + String(sensor_data.staticIaq, 0));
+    canvas.println("IAQ Accuracy: " + String(sensor_data.iaqAccuracy));
     canvas.println("CO2: " + String(sensor_data.equivCo2, 1) + "ppm");
     canvas.println("VOC: " + String(sensor_data.equivVoc, 1) + "ppm");
     canvas.println("Gas: " + String(sensor_data.gas) + "Ohm | " + String(sensor_data.gasPercentage, 1) + " %");
