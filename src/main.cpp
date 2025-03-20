@@ -109,14 +109,9 @@ void setup(void)
 
   display.setTextColor(ST77XX_WHITE);
   display.setTextSize(3);
-  canvas.setCursor(5, 30); // Pos. is BASE LINE when using fonts!
-  display.print(TITLE);
-  display.print(" ");
+  display.println(TITLE);
   display.setTextSize(2);
-  display.print(VERSION);
-  display.setTextSize(3);
-  display.println();
-  display.setTextSize(2);
+  display.printf("Version %s\n\r", VERSION);
   display.printf(
     "BSEC %d.%d.%d.%d\n\r", 
     envSensor.version.major,
