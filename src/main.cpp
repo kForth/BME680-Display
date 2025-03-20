@@ -21,6 +21,17 @@
 #define IAQ_DANGER = 200
 #define IAQ_WARNING = 100
 #define IAD_SAFE = 50
+float iaqLevels[] = { 50, 100, 150, 200, 250, 350, 65535 };
+uint8_t numIaqLevels = ARRAY_LEN(iaqLevels);
+String iaqText[] = {
+  "Excellent",
+  "Good",
+  "Lightly Polluted",
+  "Moderately Polluted",
+  "Heavily Polluted",
+  "Severely Polluted",
+  "Extremely Polluted",
+};
 
 void bsecCheckStatus();
 void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bsec);
@@ -49,20 +60,21 @@ bsecSensor sensorList[] = {
 struct state {
   int timestamp;
   float iaq;
-  int iaq_accuracy;
-  float raw_temp;
-  float raw_pressure;
-  float raw_humidity;
-  float raw_gas;
-  float stabilization_status;
-  float run_in_status;
+  int iaqAccuracy;
+  float temperatureRaw;
+  float pressureRaw;
+  float humidtyRaw;
+  float gasRaw;
+  float stabilizationstatus;
+  float runInStatus;
   float temperature;
   float humidity;
-  float static_iaq;
-  float co2_equiv;
-  float breath_voc_equiv;
-  float gas_percentage;
+  float staticIaq;
+  float equivCo2;
+  float equivVoc;
+  float gasPercentage;
   float gas;
+  String airQuality;
 };
 state sensor_data;
 
@@ -122,20 +134,35 @@ void setup(void)
 void updateCanvas() {
   canvas.fillScreen(0);
   canvas.setTextColor(ST77XX_WHITE);
-  canvas.setTextSize(2);
-  canvas.setCursor(5, 20); // Pos. is BASE LINE when using fonts!
-  canvas.println("Timestamp: " + String(sensor_data.timestamp));
-  canvas.println("IAQ: " + String(sensor_data.iaq, 0) + " (" + String(sensor_data.iaq_accuracy) + ")");
-  canvas.println("Temperature: " + String(sensor_data.temperature, 1) + " C");
-  canvas.println("Humidity: " + String(sensor_data.humidity, 1) + " %");
-  canvas.println("IAQ: " + String(sensor_data.static_iaq, 0));
-  canvas.println("CO2: " + String(sensor_data.co2_equiv));
-  canvas.println("VOC: " + String(sensor_data.breath_voc_equiv));
-  canvas.println("Gas Percentage: " + String(sensor_data.gas_percentage) + " %");
-  canvas.println("Gas: " + String(sensor_data.gas));
-  canvas.println("Stabilized: " + String(sensor_data.stabilization_status, 0));
-  canvas.println("Run-in Status: " + String(sensor_data.run_in_status, 0));
-  canvas.println();
+  canvas.setCursor(0, 20);
+  if (!sensor_data.stabilizationstatus) {
+    canvas.setTextSize(3);
+    canvas.println("Stabilizing...");
+    canvas.setTextSize(2);
+    canvas.println("This may take a while...");
+    canvas.println();
+  }
+  else if (!sensor_data.runInStatus) {
+    canvas.setTextSize(2);
+    canvas.println("Run-In in Progress...");
+    canvas.println("This may take a while...");
+    canvas.println();
+  }
+  else {
+    canvas.setTextSize(2);
+    canvas.println("Air Quality: " + String(sensor_data.airQuality));
+    canvas.println();
+    canvas.println("Timestamp: " + String(sensor_data.timestamp));
+    canvas.println("IAQ: " + String(sensor_data.iaq, 0) + " (" + String(sensor_data.iaqAccuracy) + ")");
+    canvas.println("Temperature: " + String(sensor_data.temperature, 1) + " C");
+    canvas.println("Humidity: " + String(sensor_data.humidity, 1) + " %");
+    canvas.println("Pressure: " + String(sensor_data.pressureRaw, 1) + " Pa");
+    canvas.println("IAQ: " + String(sensor_data.staticIaq, 0));
+    canvas.println("CO2: " + String(sensor_data.equivCo2, 1) + "ppm");
+    canvas.println("VOC: " + String(sensor_data.equivVoc, 1) + "ppm");
+    canvas.println("Gas: " + String(sensor_data.gas) + "Ohm | " + String(sensor_data.gasPercentage, 1) + " %");
+    canvas.println();
+  }
 
   if (envSensor.status < BSEC_OK)
     canvas.println("BSEC Error: " + String(envSensor.status));
@@ -152,20 +179,21 @@ void drawDisplay() {
 }
 
 void reportToSerial() {
+  Serial.println("Air Quality: " + String(sensor_data.airQuality));
   Serial.println("Timestamp: " + String(sensor_data.timestamp));
-  Serial.println("IAQ: " + String(sensor_data.iaq) + " (" + String(sensor_data.iaq_accuracy) + ")");
-  Serial.println("Raw Temperature: " + String(sensor_data.raw_temp) + " C");
-  Serial.println("Raw Pressure: " + String(sensor_data.raw_pressure) + " Pa");
-  Serial.println("Raw Humidity: " + String(sensor_data.raw_humidity) + " %");
-  Serial.println("Raw Gas: " + String(sensor_data.raw_gas));
-  Serial.println("Stabilization Status: " + String(sensor_data.stabilization_status));
-  Serial.println("Run-in Status: " + String(sensor_data.run_in_status));
+  Serial.println("IAQ: " + String(sensor_data.iaq) + " (" + String(sensor_data.iaqAccuracy) + ")");
+  Serial.println("Raw Temperature: " + String(sensor_data.temperatureRaw) + " C");
+  Serial.println("Raw Pressure: " + String(sensor_data.pressureRaw) + " Pa");
+  Serial.println("Raw Humidity: " + String(sensor_data.humidtyRaw) + " %");
+  Serial.println("Raw Gas: " + String(sensor_data.gasRaw));
+  Serial.println("Stabilization Status: " + String(sensor_data.stabilizationstatus));
+  Serial.println("Run-in Status: " + String(sensor_data.runInStatus));
   Serial.println("Temperature: " + String(sensor_data.temperature) + " C");
   Serial.println("Humidity: " + String(sensor_data.humidity) + " %");
-  Serial.println("Static IAQ: " + String(sensor_data.static_iaq));
-  Serial.println("CO2 Equivalent: " + String(sensor_data.co2_equiv));
-  Serial.println("Breath VOC Equivalent: " + String(sensor_data.breath_voc_equiv));
-  Serial.println("Gas Percentage: " + String(sensor_data.gas_percentage) + " %");
+  Serial.println("Static IAQ: " + String(sensor_data.staticIaq));
+  Serial.println("CO2 Equivalent: " + String(sensor_data.equivCo2));
+  Serial.println("Breath VOC Equivalent: " + String(sensor_data.equivVoc));
+  Serial.println("Gas Percentage: " + String(sensor_data.gasPercentage) + " %");
   Serial.println("Gas: " + String(sensor_data.gas));
   Serial.println();
 }
@@ -199,25 +227,25 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
     {
     case BSEC_OUTPUT_IAQ:
       sensor_data.iaq = output.signal;
-      sensor_data.iaq_accuracy = (int)output.accuracy;
+      sensor_data.iaqAccuracy = (int)output.accuracy;
       break;
     case BSEC_OUTPUT_RAW_TEMPERATURE:
-      sensor_data.raw_temp = output.signal;
+      sensor_data.temperatureRaw = output.signal;
       break;
     case BSEC_OUTPUT_RAW_PRESSURE:
-      sensor_data.raw_pressure = output.signal;
+      sensor_data.pressureRaw = output.signal;
       break;
     case BSEC_OUTPUT_RAW_HUMIDITY:
-      sensor_data.raw_humidity = output.signal;
+      sensor_data.humidtyRaw = output.signal;
       break;
     case BSEC_OUTPUT_RAW_GAS:
-      sensor_data.raw_gas = output.signal;
+      sensor_data.gasRaw = output.signal;
       break;
     case BSEC_OUTPUT_STABILIZATION_STATUS:
-      sensor_data.stabilization_status = output.signal;
+      sensor_data.stabilizationstatus = output.signal;
       break;
     case BSEC_OUTPUT_RUN_IN_STATUS:
-      sensor_data.run_in_status = output.signal;
+      sensor_data.runInStatus = output.signal;
       break;
     case BSEC_OUTPUT_SENSOR_HEAT_COMPENSATED_TEMPERATURE:
       sensor_data.temperature = output.signal;
@@ -226,21 +254,29 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
       sensor_data.humidity = output.signal;
       break;
     case BSEC_OUTPUT_STATIC_IAQ:
-      sensor_data.static_iaq = output.signal;
+      sensor_data.staticIaq = output.signal;
       break;
     case BSEC_OUTPUT_CO2_EQUIVALENT:
-      sensor_data.co2_equiv = output.signal;
+      sensor_data.equivCo2 = output.signal;
       break;
     case BSEC_OUTPUT_BREATH_VOC_EQUIVALENT:
-      sensor_data.breath_voc_equiv = output.signal;
+      sensor_data.equivVoc = output.signal;
       break;
     case BSEC_OUTPUT_GAS_PERCENTAGE:
-      sensor_data.gas_percentage = output.signal;
+      sensor_data.gasPercentage = output.signal;
       break;
     case BSEC_OUTPUT_COMPENSATED_GAS:
       sensor_data.gas = output.signal;
       break;
     default:
+      break;
+    }
+  }
+
+  sensor_data.airQuality = iaqText[numIaqLevels + 1];
+  for(uint8_t i = 0; i < numIaqLevels; i++){
+    if(sensor_data.iaq <= iaqLevels[i]) {
+      sensor_data.airQuality = iaqText[i];
       break;
     }
   }
