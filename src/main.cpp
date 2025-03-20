@@ -35,6 +35,8 @@ String iaqText[] = {
 
 void bsecCheckStatus();
 void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bsec);
+String getStatusStringBME(int code);
+String getStatusStringBSEC(bsec_library_return_t code);
 void reportToSerial();
 void updateCanvas();
 void drawDisplay();
@@ -279,8 +281,110 @@ void bsecDataCallback(const bme68xData data, const bsecOutputs outputs, Bsec2 bs
 
 void bsecCheckStatus()
 {
-  if (envSensor.status != BSEC_OK)
-    Serial.printf("BSEC %s: %d\n\r", envSensor.status < BSEC_OK ? "Error": "Warn", envSensor.status);
+  if (envSensor.status != BSEC_OK && envSensor.status != 100)
+    Serial.printf("BSEC %s (%d): %s\n\r", envSensor.status < BSEC_OK ? "Error": "Warn", envSensor.status, getStatusStringBSEC(envSensor.status));
   if (envSensor.sensor.status != BME68X_OK)
-    Serial.printf("BME68X %s: %d\n\r", envSensor.sensor.status < BME68X_OK ? "Error": "Warn", envSensor.sensor.status);
+    Serial.printf("BME68X %s: %d\n\r", envSensor.sensor.status < BME68X_OK ? "Error": "Warn", envSensor.sensor.status, getStatusStringBME(envSensor.status));
+}
+
+String getStatusStringBME(int code) {
+  switch(code) {
+  case BME68X_OK:
+    return "OK";
+  case BME68X_E_NULL_PTR:
+    return "NULL_PTR";
+  case BME68X_E_COM_FAIL:
+    return "COM_FAIL";
+  case BME68X_E_DEV_NOT_FOUND:
+    return "DEV_NOT_FOUND";
+  case BME68X_E_INVALID_LENGTH:
+    return "INVALID_LENGTH";
+  case BME68X_E_SELF_TEST:
+    return "SELF_TEST";
+  case BME68X_W_DEFINE_OP_MODE:
+    return "DEFINE_OP_MODE";
+  case BME68X_W_NO_NEW_DATA:
+    return "NO_NEW_DATA";
+  case BME68X_W_DEFINE_SHD_HEATR_DUR:
+    return "DEFINE_SHD_HEATR_DUR";
+  default:
+    return "UNKNOWN";
+  }
+}
+
+String getStatusStringBSEC(bsec_library_return_t code) {
+  switch(code){
+  case BSEC_OK:
+    return "Function execution successful";
+  case BSEC_E_DOSTEPS_INVALIDINPUT:
+    return "Input (physical) sensor id passed to bsec_do_steps() is not in the valid range or not valid for requested virtual sensor";
+  case BSEC_E_DOSTEPS_VALUELIMITS:
+    return "Value of input (physical) sensor signal passed to bsec_do_steps() is not in the valid range";
+  case BSEC_W_DOSTEPS_TSINTRADIFFOUTOFRANGE:
+    return "Past timestamps passed to bsec_do_steps()";
+  case BSEC_E_DOSTEPS_DUPLICATEINPUT:
+    return "Duplicate input (physical) sensor ids passed as input to bsec_do_steps()";
+  case BSEC_I_DOSTEPS_NOOUTPUTSRETURNABLE:
+    return "No memory allocated to hold return values from bsec_do_steps(), i.e., n_outputs == 0";
+  case BSEC_W_DOSTEPS_EXCESSOUTPUTS:
+    return "Not enough memory allocated to hold return values from bsec_do_steps(), i.e., n_outputs < maximum number of requested output (virtual) sensors";
+  case BSEC_W_DOSTEPS_GASINDEXMISS:
+    return "Gas index not provided to bsec_do_steps()";
+  case BSEC_E_SU_WRONGDATARATE:
+    return "The sample_rate of the requested output (virtual) sensor passed to bsec_update_subscription() is zero";
+  case BSEC_E_SU_SAMPLERATELIMITS:
+    return "The sample_rate of the requested output (virtual) sensor passed to bsec_update_subscription() does not match with the sampling rate allowed for that sensor";
+  case BSEC_E_SU_DUPLICATEGATE:
+    return "Duplicate output (virtual) sensor ids requested through bsec_update_subscription()";
+  case BSEC_E_SU_INVALIDSAMPLERATE:
+    return "The sample_rate of the requested output (virtual) sensor passed to bsec_update_subscription() does not fall within the global minimum and maximum sampling rates ";
+  case BSEC_E_SU_GATECOUNTEXCEEDSARRAY:
+    return "Not enough memory allocated to hold returned input (physical) sensor data from bsec_update_subscription(), i.e., n_required_sensor_settings ::BSEC_MAX_PHYSICAL_SENSOR";
+  case BSEC_E_SU_SAMPLINTVLINTEGERMULT:
+    return "The sample_rate of the requested output (virtual) sensor passed to bsec_update_subscription() is not correct";
+  case BSEC_E_SU_MULTGASSAMPLINTVL:
+    return "The sample_rate of the requested output (virtual), which requires the gas sensor, is not equal to the sample_rate that the gas sensor is being operated";
+  case BSEC_E_SU_HIGHHEATERONDURATION:
+    return "The duration of one measurement is longer than the requested sampling interval";
+  case BSEC_W_SU_UNKNOWNOUTPUTGATE:
+    return "Output (virtual) sensor id passed to bsec_update_subscription() is not in the valid range; e.g., n_requested_virtual_sensors > actual number of output (virtual) sensors requested";
+  case BSEC_W_SU_MODINNOULP:
+    return "ULP plus can not be requested in non-ulp mode */ /*MOD_ONL";
+  case BSEC_I_SU_SUBSCRIBEDOUTPUTGATES:
+    return "No output (virtual) sensor data were requested via bsec_update_subscription()";
+  case BSEC_I_SU_GASESTIMATEPRECEDENCE:
+    return "GAS_ESTIMATE is suscribed and take precedence over other requested outputs";
+  case BSEC_W_SU_SAMPLERATEMISMATCH:
+    return "Subscriped sample rate of the output is not matching with configured sample rate. For example if user used the configuration of ULP and outputs subscribed for LP mode this warning will inform the user about this mismatc";
+  case BSEC_E_PARSE_SECTIONEXCEEDSWORKBUFFER:
+    return "n_work_buffer_size passed to bsec_set_[configuration/state]() not sufficient";
+  case BSEC_E_CONFIG_FAIL:
+    return "Configuration failed";
+  case BSEC_E_CONFIG_VERSIONMISMATCH:
+    return "Version encoded in serialized_[settings/state] passed to bsec_set_[configuration/state]() does not match with current version";
+  case BSEC_E_CONFIG_FEATUREMISMATCH:
+    return "Enabled features encoded in serialized_[settings/state] passed to bsec_set_[configuration/state]() does not match with current library implementation or subscribed output";
+  case BSEC_E_CONFIG_CRCMISMATCH:
+    return "serialized_[settings/state] passed to bsec_set_[configuration/state]() is corrupted";
+  case BSEC_E_CONFIG_EMPTY:
+    return "n_serialized_[settings/state] passed to bsec_set_[configuration/state]() is to short to be valid";
+  case BSEC_E_CONFIG_INSUFFICIENTWORKBUFFER:
+    return "Provided work_buffer is not large enough to hold the desired string";
+  case BSEC_E_CONFIG_INVALIDSTRINGSIZE:
+    return "String size encoded in configuration/state strings passed to bsec_set_[configuration/state]() does not match with the actual string size n_serialized_[settings/state] passed to these functions";
+  case BSEC_E_CONFIG_INSUFFICIENTBUFFER:
+    return "String buffer insufficient to hold serialized data from BSEC library";
+  case BSEC_E_SET_INVALIDCHANNELIDENTIFIER:
+    return "Internal error code, size of work buffer in setConfig must be set to #BSEC_MAX_WORKBUFFER_SIZE";
+  case BSEC_E_SET_INVALIDLENGTH:
+    return "Internal error code";
+  case BSEC_W_SC_CALL_TIMING_VIOLATION:
+    return "Difference between actual and defined sampling intervals of bsec_sensor_control() greater than allowed";
+  case BSEC_W_SC_MODEXCEEDULPTIMELIMIT:
+    return "ULP plus is not allowed because an ULP measurement just took or will take place */ /*MOD_ONL";
+  case BSEC_W_SC_MODINSUFFICIENTWAITTIME:
+    return "ULP plus is not allowed because not sufficient time passed since last ULP plus */ /*MOD_ONL";
+  default:
+    return "Unknown Error";
+  }
 }
